@@ -1,0 +1,20 @@
+{
+  "name": "vernesoft/sdk",
+  "description": "Official PHP SDK for the Verne Nautilus platform",
+  "type": "library",
+  "license": "MIT",
+  "require": {
+    "php": ">=8.1",
+    "guzzlehttp/guzzle": "^7.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.0",
+    "laravel/pint": "^1.0"
+  },
+  "autoload": {
+    "psr-4": { "Vernesoft\\": "src/" }
+  },
+  "autoload-dev": {
+    "psr-4": { "Vernesoft\\Tests\\": "tests/" }
+  }
+}
