@@ -109,6 +109,75 @@ class GateTest extends TestCase
         $this->assertTrue(true);
     }
 
+    public function test_set_state_sends_patch_with_state_body(): void
+    {
+        $history = [];
+        $gate = $this->makeGate([
+            new Response(200, [], json_encode([
+                'id' => 'identity_123',
+                'schema_id' => 'user',
+                'state' => 'inactive',
+                'traits' => ['email' => 'user@example.com', 'tenant_id' => 'ten_001'],
+            ])),
+        ], $history);
+
+        $identity = $gate->identities()->setState('identity_123', 'inactive');
+
+        $this->assertSame('inactive', $identity->state);
+        $request = $history[0]['request'];
+        $this->assertSame('PATCH', $request->getMethod());
+        $this->assertSame('/v1/gate/identities/identity_123/state', $request->getUri()->getPath());
+        $this->assertSame(['state' => 'inactive'], json_decode((string) $request->getBody(), true));
+    }
+
+    public function test_activate_sends_state_active(): void
+    {
+        $history = [];
+        $gate = $this->makeGate([
+            new Response(200, [], json_encode([
+                'id' => 'identity_123',
+                'schema_id' => 'user',
+                'state' => 'active',
+                'traits' => ['email' => 'user@example.com', 'tenant_id' => 'ten_001'],
+            ])),
+        ], $history);
+
+        $gate->identities()->activate('identity_123');
+
+        $this->assertSame(['state' => 'active'], json_decode((string) $history[0]['request']->getBody(), true));
+    }
+
+    public function test_deactivate_sends_state_inactive(): void
+    {
+        $history = [];
+        $gate = $this->makeGate([
+            new Response(200, [], json_encode([
+                'id' => 'identity_123',
+                'schema_id' => 'user',
+                'state' => 'inactive',
+                'traits' => ['email' => 'user@example.com', 'tenant_id' => 'ten_001'],
+            ])),
+        ], $history);
+
+        $gate->identities()->deactivate('identity_123');
+
+        $this->assertSame(['state' => 'inactive'], json_decode((string) $history[0]['request']->getBody(), true));
+    }
+
+    public function test_resend_verification_sends_post(): void
+    {
+        $history = [];
+        $gate = $this->makeGate([
+            new Response(204),
+        ], $history);
+
+        $gate->identities()->resendVerification('identity_123');
+
+        $request = $history[0]['request'];
+        $this->assertSame('POST', $request->getMethod());
+        $this->assertSame('/v1/gate/identities/identity_123/resend-verification', $request->getUri()->getPath());
+    }
+
     public function test_identities_throw_verne_api_exception_on_error(): void
     {
         $gate = $this->makeGate([
@@ -234,5 +303,44 @@ class GateTest extends TestCase
 
         $this->assertFalse($result->allowed);
         $this->assertNull($result->reason);
+    }
+
+    // --- Settings ---
+
+    public function test_get_security_settings(): void
+    {
+        $history = [];
+        $gate = $this->makeGate([
+            new Response(200, [], json_encode([
+                'passwordless_enabled' => true,
+                'mfa_enabled' => false,
+            ])),
+        ], $history);
+
+        $settings = $gate->settings()->getSecurity();
+
+        $this->assertTrue($settings->passwordlessEnabled);
+        $this->assertFalse($settings->mfaEnabled);
+        $request = $history[0]['request'];
+        $this->assertSame('GET', $request->getMethod());
+        $this->assertSame('/v1/gate/settings/security', $request->getUri()->getPath());
+    }
+
+    public function test_update_security_settings_sends_put_with_both_fields(): void
+    {
+        $history = [];
+        $gate = $this->makeGate([
+            new Response(200, [], json_encode(['status' => 'ok'])),
+        ], $history);
+
+        $gate->settings()->updateSecurity(passwordlessEnabled: true, mfaEnabled: true);
+
+        $request = $history[0]['request'];
+        $this->assertSame('PUT', $request->getMethod());
+        $this->assertSame('/v1/gate/settings/security', $request->getUri()->getPath());
+        $this->assertSame(
+            ['passwordless_enabled' => true, 'mfa_enabled' => true],
+            json_decode((string) $request->getBody(), true),
+        );
     }
 }

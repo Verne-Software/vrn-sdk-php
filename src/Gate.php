@@ -7,6 +7,7 @@ namespace Vernesoft;
 use GuzzleHttp\ClientInterface;
 use Vernesoft\Core\HttpClient;
 use Vernesoft\Resources\Gate\IdentitiesResource;
+use Vernesoft\Resources\Gate\SettingsResource;
 use Vernesoft\Resources\Gate\TokensResource;
 use Vernesoft\Resources\Gate\Types\AuthorizeResult;
 
@@ -17,6 +18,8 @@ class Gate
     private ?IdentitiesResource $identitiesResource = null;
 
     private ?TokensResource $tokensResource = null;
+
+    private ?SettingsResource $settingsResource = null;
 
     public function __construct(
         private string $apiKey,
@@ -40,6 +43,11 @@ class Gate
     public function tokens(): TokensResource
     {
         return $this->tokensResource ??= new TokensResource($this->httpClient, $this->apiKey);
+    }
+
+    public function settings(): SettingsResource
+    {
+        return $this->settingsResource ??= new SettingsResource($this->httpClient);
     }
 
     public function authorize(

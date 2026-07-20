@@ -53,4 +53,44 @@ class IdentitiesResource
     {
         $this->httpClient->delete('/v1/gate/identities/'.$identityId);
     }
+
+    /**
+     * Activates or deactivates an identity. An `inactive` identity cannot log in —
+     * Kratos rejects its credentials automatically — until it is reactivated.
+     * The identity is not deleted. Fires the `identity.state_changed` webhook event.
+     *
+     * @param  'active'|'inactive'  $state
+     */
+    public function setState(string $identityId, string $state): Identity
+    {
+        $data = $this->httpClient->patch('/v1/gate/identities/'.$identityId.'/state', ['state' => $state]);
+
+        return Identity::fromArray($data);
+    }
+
+    /**
+     * Convenience wrapper for setState($identityId, 'active').
+     */
+    public function activate(string $identityId): Identity
+    {
+        return $this->setState($identityId, 'active');
+    }
+
+    /**
+     * Convenience wrapper for setState($identityId, 'inactive').
+     */
+    public function deactivate(string $identityId): Identity
+    {
+        return $this->setState($identityId, 'inactive');
+    }
+
+    /**
+     * Triggers a new email verification flow for an identity — useful when the
+     * original verification email expired or was never received. The user
+     * receives a fresh verification email.
+     */
+    public function resendVerification(string $identityId): void
+    {
+        $this->httpClient->post('/v1/gate/identities/'.$identityId.'/resend-verification');
+    }
 }

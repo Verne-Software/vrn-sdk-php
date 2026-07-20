@@ -101,6 +101,30 @@ $verne->gate()->identities()->patch($identity->id, [
 
 // Delete a user
 $verne->gate()->identities()->delete($identity->id);
+
+// Activate / deactivate a user (an inactive user cannot log in)
+$verne->gate()->identities()->deactivate($identity->id);
+$verne->gate()->identities()->activate($identity->id);
+// …or set the state explicitly:
+$verne->gate()->identities()->setState($identity->id, 'inactive');
+
+// Resend the email verification link
+$verne->gate()->identities()->resendVerification($identity->id);
+```
+
+### Security Settings
+
+Read or replace the tenant's security settings (passwordless login, TOTP MFA):
+
+```php
+$security = $verne->gate()->settings()->getSecurity();
+// $security->passwordlessEnabled, $security->mfaEnabled
+
+// Both fields are required — the update is a full replacement, not a merge.
+$verne->gate()->settings()->updateSecurity(
+    passwordlessEnabled: true,
+    mfaEnabled: false,
+);
 ```
 
 ### Access Tokens
