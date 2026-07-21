@@ -70,4 +70,31 @@ class Gate
 
         return AuthorizeResult::fromArray($data);
     }
+
+    /**
+     * Returns the social login providers currently enabled for a tenant. This
+     * is a public, unauthenticated endpoint — call it from your login /
+     * registration page to decide which social buttons to render.
+     *
+     * @return string[]
+     */
+    public function getEnabledProviders(string $tenantId): array
+    {
+        $data = $this->httpClient->get('/public/gate/providers/'.rawurlencode($tenantId));
+
+        return $data['providers'] ?? [];
+    }
+
+    /**
+     * Initializes a Kratos login flow using your Gate API key. Call this from
+     * your server and pass the returned flow to your browser-side code to
+     * render social login buttons. The flow already contains only the
+     * providers your tenant has enabled.
+     *
+     * @return array<string, mixed>
+     */
+    public function createLoginFlow(): array
+    {
+        return $this->httpClient->get('/v1/gate/auth/login') ?? [];
+    }
 }

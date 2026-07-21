@@ -12,6 +12,7 @@ use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\TestCase;
 use Vernesoft\Core\Errors\VerneApiException;
 use Vernesoft\Gate;
+use Vernesoft\Resources\Gate\Types\OidcProvider;
 
 class GateTest extends TestCase
 {
@@ -342,5 +343,88 @@ class GateTest extends TestCase
             ['passwordless_enabled' => true, 'mfa_enabled' => true],
             json_decode((string) $request->getBody(), true),
         );
+    }
+
+    // --- Social auth (OIDC providers) ---
+
+    public function test_get_oidc_providers_returns_typed_list(): void
+    {
+        $history = [];
+        $gate = $this->makeGate([
+            new Response(200, [], json_encode([
+                'providers' => [
+                    ['provider' => 'github', 'enabled' => true],
+                    ['provider' => 'google', 'enabled' => false],
+                ],
+            ])),
+        ], $history);
+
+        $providers = $gate->settings()->getOidcProviders();
+
+        $this->assertCount(2, $providers);
+        $this->assertSame('github', $providers[0]->provider);
+        $this->assertTrue($providers[0]->enabled);
+        $this->assertSame('google', $providers[1]->provider);
+        $this->assertFalse($providers[1]->enabled);
+        $request = $history[0]['request'];
+        $this->assertSame('GET', $request->getMethod());
+        $this->assertSame('/v1/gate/settings/oidc-providers', $request->getUri()->getPath());
+    }
+
+    public function test_update_oidc_providers_sends_put_wrapped_in_providers(): void
+    {
+        $history = [];
+        $gate = $this->makeGate([
+            new Response(200, [], json_encode([
+                'providers' => [['provider' => 'github', 'enabled' => true]],
+            ])),
+        ], $history);
+
+        $result = $gate->settings()->updateOidcProviders([
+            new OidcProvider(provider: 'github', enabled: true),
+        ]);
+
+        $this->assertCount(1, $result);
+        $this->assertSame('github', $result[0]->provider);
+        $request = $history[0]['request'];
+        $this->assertSame('PUT', $request->getMethod());
+        $this->assertSame('/v1/gate/settings/oidc-providers', $request->getUri()->getPath());
+        $this->assertSame(
+            ['providers' => [['provider' => 'github', 'enabled' => true]]],
+            json_decode((string) $request->getBody(), true),
+        );
+    }
+
+    public function test_get_enabled_providers_hits_public_endpoint(): void
+    {
+        $history = [];
+        $gate = $this->makeGate([
+            new Response(200, [], json_encode(['providers' => ['github', 'google']])),
+        ], $history);
+
+        $providers = $gate->getEnabledProviders('ten_001');
+
+        $this->assertSame(['github', 'google'], $providers);
+        $request = $history[0]['request'];
+        $this->assertSame('GET', $request->getMethod());
+        $this->assertSame('/public/gate/providers/ten_001', $request->getUri()->getPath());
+    }
+
+    public function test_create_login_flow_returns_raw_flow(): void
+    {
+        $history = [];
+        $gate = $this->makeGate([
+            new Response(200, [], json_encode([
+                'id' => 'flow_1',
+                'ui' => ['action' => 'https://api.vernesoft.com/auth/x', 'nodes' => []],
+            ])),
+        ], $history);
+
+        $flow = $gate->createLoginFlow();
+
+        $this->assertSame('flow_1', $flow['id']);
+        $request = $history[0]['request'];
+        $this->assertSame('GET', $request->getMethod());
+        $this->assertSame('/v1/gate/auth/login', $request->getUri()->getPath());
     }
 }

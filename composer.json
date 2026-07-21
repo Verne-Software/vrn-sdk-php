@@ -1,5 +1,6 @@
 {
   "name": "vernesoft/sdk",
+  "version": "1.1.0",
   "description": "Official PHP SDK for the Verne Nautilus platform",
   "type": "library",
   "license": "MIT",
