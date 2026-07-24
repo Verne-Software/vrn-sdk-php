@@ -12,9 +12,12 @@ class Verne
 
     private ?Gate $gateClient = null;
 
+    private ?Passepartout $passepartoutClient = null;
+
     public function __construct(
         private ?string $relay = null,
         private ?string $gate = null,
+        private ?string $passepartout = null,
         private string $baseUrl = 'https://api.vernesoft.com',
         private int $timeoutSeconds = 30,
     ) {}
@@ -40,6 +43,19 @@ class Verne
 
         return $this->gateClient ??= new Gate(
             apiKey: $this->gate,
+            baseUrl: $this->baseUrl,
+            timeoutSeconds: $this->timeoutSeconds,
+        );
+    }
+
+    public function passepartout(): Passepartout
+    {
+        if ($this->passepartout === null) {
+            throw new VerneException('Passepartout API key not provided.');
+        }
+
+        return $this->passepartoutClient ??= new Passepartout(
+            apiKey: $this->passepartout,
             baseUrl: $this->baseUrl,
             timeoutSeconds: $this->timeoutSeconds,
         );
