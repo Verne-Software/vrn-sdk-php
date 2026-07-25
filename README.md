@@ -26,6 +26,7 @@ use Vernesoft\Verne;
 $verne = new Verne(
     relay: $_ENV['VERNE_RELAY_KEY'],
     gate: $_ENV['VERNE_GATE_KEY'],
+    clockwork: $_ENV['VERNE_CLOCKWORK_KEY'],
 );
 ```
 
@@ -166,6 +167,59 @@ $decision = $verne->gate()->authorize(
 if (! $decision->allowed) {
     throw new \RuntimeException('Forbidden');
 }
+```
+
+## Clockwork — Cron-as-a-Service
+
+Schedule recurring cron jobs and one-off delayed jobs that call your HTTP endpoints.
+
+### Cron Jobs
+
+```php
+// Create a recurring job (standard 5-field cron expression)
+$job = $verne->clockwork()->jobs()->create(
+    name: 'nightly-report',
+    schedule: '0 2 * * *',
+    url: 'https://example.com/hooks/report',
+    method: 'POST',                     // optional (defaults server-side)
+    headers: ['X-Token' => 'secret'],   // optional
+    body: '{"scope":"daily"}',          // optional
+);
+
+// List all cron jobs
+$jobs = $verne->clockwork()->jobs()->list(); // CronJob[]
+
+// Update a job (snake_case fields — e.g. pause it)
+$verne->clockwork()->jobs()->update($job->id, ['is_active' => false]);
+
+// Inspect run history
+$executions = $verne->clockwork()->jobs()->executions($job->id); // Execution[]
+
+// Delete a job
+$verne->clockwork()->jobs()->delete($job->id);
+```
+
+### Delayed Jobs
+
+One-off jobs that fire once at a specific time:
+
+```php
+// Schedule a delayed job
+$delayed = $verne->clockwork()->delayed()->create(
+    name: 'send-reminder',
+    runAt: '2026-08-01T09:00:00Z',
+    url: 'https://example.com/hooks/reminder',
+    method: 'POST',
+);
+
+// List scheduled delayed jobs
+$verne->clockwork()->delayed()->list(); // DelayedJob[]
+
+// Inspect run history
+$verne->clockwork()->delayed()->executions($delayed->id); // Execution[]
+
+// Cancel before it runs
+$verne->clockwork()->delayed()->cancel($delayed->id);
 ```
 
 ## Error Handling

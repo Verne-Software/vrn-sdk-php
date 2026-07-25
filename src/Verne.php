@@ -14,10 +14,13 @@ class Verne
 
     private ?Passepartout $passepartoutClient = null;
 
+    private ?Clockwork $clockworkClient = null;
+
     public function __construct(
         private ?string $relay = null,
         private ?string $gate = null,
         private ?string $passepartout = null,
+        private ?string $clockwork = null,
         private string $baseUrl = 'https://api.vernesoft.com',
         private int $timeoutSeconds = 30,
     ) {}
@@ -56,6 +59,19 @@ class Verne
 
         return $this->passepartoutClient ??= new Passepartout(
             apiKey: $this->passepartout,
+            baseUrl: $this->baseUrl,
+            timeoutSeconds: $this->timeoutSeconds,
+        );
+    }
+
+    public function clockwork(): Clockwork
+    {
+        if ($this->clockwork === null) {
+            throw new VerneException('Clockwork API key not provided.');
+        }
+
+        return $this->clockworkClient ??= new Clockwork(
+            apiKey: $this->clockwork,
             baseUrl: $this->baseUrl,
             timeoutSeconds: $this->timeoutSeconds,
         );

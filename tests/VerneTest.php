@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vernesoft\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Vernesoft\Clockwork;
 use Vernesoft\Core\Errors\VerneException;
 use Vernesoft\Gate;
 use Vernesoft\Relay;
@@ -75,5 +76,32 @@ class VerneTest extends TestCase
 
         $this->assertInstanceOf(Relay::class, $verne->relay());
         $this->assertInstanceOf(Gate::class, $verne->gate());
+    }
+
+    public function test_clockwork_throws_when_key_not_provided(): void
+    {
+        $verne = new Verne(relay: 'vrn_relay_test_sk_abc');
+
+        $this->expectException(VerneException::class);
+        $this->expectExceptionMessage('Clockwork API key not provided.');
+
+        $verne->clockwork();
+    }
+
+    public function test_clockwork_returns_clockwork_instance(): void
+    {
+        $verne = new Verne(clockwork: 'vrn_clockwork_test_sk_abc');
+
+        $this->assertInstanceOf(Clockwork::class, $verne->clockwork());
+    }
+
+    public function test_clockwork_is_lazily_initialized(): void
+    {
+        $verne = new Verne(clockwork: 'vrn_clockwork_test_sk_abc');
+
+        $clockwork1 = $verne->clockwork();
+        $clockwork2 = $verne->clockwork();
+
+        $this->assertSame($clockwork1, $clockwork2);
     }
 }
