@@ -188,21 +188,45 @@ class RelayTest extends TestCase
         $this->assertSame('msg_retry', $message->id);
     }
 
-    public function test_send_throws_on409_duplicate(): void
+    /**
+     * A repeated idempotency key replays; it does not fail.
+     *
+     * This test asserted a 409 until the gateway grew a translation layer for
+     * `/v1/relay/*` and the reference was corrected to match what Relay
+     * actually does: the second send returns 202 with the *originally* accepted
+     * message, same id and same timestamp. Nothing here has to tell a duplicate
+     * apart from a success, which is the point.
+     *
+     * Error mapping is still covered — on the statuses the API really returns —
+     * by the 400 and 401 tests above.
+     */
+    public function test_send_replays_a_repeated_idempotency_key(): void
     {
-        $relay = $this->makeRelay([
-            new Response(409, [], json_encode([
-                'error' => [
-                    'code' => 'duplicate_idempotency_key',
-                    'message' => 'Duplicate idempotency key.',
-                    'request_id' => 'req_dup',
-                ],
-            ])),
+        $accepted = json_encode([
+            'id' => 'msg_original',
+            'event_type' => 'user.created',
+            'status' => 'accepted',
+            'timestamp' => '2026-01-01T00:00:00Z',
         ]);
 
-        $this->expectException(VerneApiException::class);
-        $this->expectExceptionCode(409);
+        $relay = $this->makeRelay([
+            new Response(202, [], $accepted),
+            new Response(202, [], $accepted),
+        ]);
 
-        $relay->messages()->send(eventType: 'ping', payload: [], idempotencyKey: 'dup_key');
+        $first = $relay->messages()->send(
+            eventType: 'user.created',
+            payload: ['n' => 1],
+            idempotencyKey: 'dup_key',
+        );
+        $second = $relay->messages()->send(
+            eventType: 'user.created',
+            payload: ['n' => 2],
+            idempotencyKey: 'dup_key',
+        );
+
+        $this->assertSame($first->id, $second->id);
+        $this->assertSame($first->timestamp, $second->timestamp);
+        $this->assertSame('accepted', $second->status);
     }
 }
