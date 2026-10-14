@@ -1,7 +1,7 @@
 # Verne Software PHP SDK
 
 [![Packagist Version](https://img.shields.io/packagist/v/vernesoft/sdk.svg)](https://packagist.org/packages/vernesoft/sdk)
-[![PHP](https://img.shields.io/badge/PHP-8.1%2B-blue.svg)](#)
+[![PHP](https://img.shields.io/badge/PHP-8.2%2B-blue.svg)](#)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 The official PHP library for the [Verne Nautilus](https://vernesoft.com) platform.
@@ -10,7 +10,7 @@ The official PHP library for the [Verne Nautilus](https://vernesoft.com) platfor
 
 ## Requirements
 
-PHP 8.1 or later. `ext-openssl` to verify signed tokens.
+PHP 8.2 or later (the response types are readonly classes). `ext-openssl` to verify signed tokens.
 
 ## Installation
 

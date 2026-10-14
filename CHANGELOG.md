@@ -44,6 +44,7 @@ All notable changes to `vernesoft/sdk`. The format follows
   `scripts/local-stack-key.php` to get a throwaway key on a local one.
 
 ### Changed
+- `composer.json` now requires PHP `>=8.2`. The response types are `readonly` classes, which PHP 8.1 cannot load; the old `>=8.1` constraint was wrong since 1.3.0.
 
 - Aligned with the API changes of October 2026: `AuthorizeResult` gains `message`, and
   `AuthorizeReason` gains `OWNED_BY_TENANT`, `NOT_OWNED_BY_TENANT` and
