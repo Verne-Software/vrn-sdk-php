@@ -43,6 +43,18 @@ All notable changes to `vernesoft/sdk`. The format follows
 - `composer test:integration`: an opt-in suite against a running stack, and
   `scripts/local-stack-key.php` to get a throwaway key on a local one.
 
+### Changed
+
+- Aligned with the API changes of October 2026: `AuthorizeResult` gains `message`, and
+  `AuthorizeReason` gains `OWNED_BY_TENANT`, `NOT_OWNED_BY_TENANT` and
+  `NOT_A_KNOWN_IDENTITY` (with `SUBJECT_INACTIVE`, the codes of a check on a resource that
+  is not an organization); the sentence that check used to put in `reason` is now
+  `message`. `sessions()->revokeAll()` is documented as succeeding for a user with no
+  session (`204`, it was a `404`). Docs and comments name `invalid_payload` (not
+  `invalid_request`) for a malformed token request and treat Clockwork errors as the
+  standard envelope; the string-form and numeric-code parsing stays as a fallback.
+  Identities no longer carry `metadata_public.verne_tenant_id`; the SDK never read it.
+
 ### Fixed
 
 - `tokens()->create()` sent the key in the request body without an `Authorization`

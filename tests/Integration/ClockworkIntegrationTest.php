@@ -33,15 +33,16 @@ class ClockworkIntegrationTest extends TestCase
         $this->assertIsInt($usage->delayed->pending);
     }
 
-    public function test_an_engine_error_that_is_a_plain_string_keeps_its_sentence(): void
+    public function test_an_engine_error_is_the_standard_envelope(): void
     {
         try {
             $this->clockwork->jobs()->create(name: 'sdk-php-bad', schedule: 'not a schedule', url: 'https://example.com');
             $this->fail('expected a 400');
         } catch (VerneApiException $e) {
             $this->assertSame(400, $e->getCode());
-            $this->assertSame('unknown', $e->getErrorCode());
+            $this->assertSame('invalid_payload', $e->getErrorCode());
             $this->assertMatchesRegularExpression('/cron/i', $e->getMessage());
+            $this->assertStringStartsWith('req_', (string) $e->getRequestId());
         }
     }
 }

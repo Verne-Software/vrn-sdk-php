@@ -12,8 +12,9 @@ namespace Vernesoft\Resources\Gate\Types;
 final readonly class IdentityTraits
 {
     /**
-     * @param  string|null  $tenantId  Deprecated: the API never returns it, so it is always
-     *                                 `null`. Kept so code that reads it still runs.
+     * @param  string|null  $tenantId  Deprecated: the API never returns it (nor, since October
+     *                                 2026, `metadata_public.verne_tenant_id`), so it is
+     *                                 always `null`. Kept so code that reads it still runs.
      * @param  array|null  $customData  Deprecated: there is no `custom_data` trait (creating
      *                                  with one is a `400 invalid_payload`). Use custom metadata.
      * @param  array<string, mixed>  $extra  Any other trait the identity carries.

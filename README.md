@@ -176,7 +176,12 @@ $decision = $gate->organizations()->authorize($org->id, $identity->id, 'invoices
 
 `reason` is one of the `AuthorizeReason` constants — `member_with_permission`, `member_without_permission`, `not_a_member`, `subject_inactive`, `no_such_organization`; `role` is set when the user is a member. The match is exact (no wildcards) and live. A permission no role could hold (`Invoices:*`, the `nautilus:` prefix) is a `400 invalid_payload` exception, never `false`.
 
-`$gate->authorize(subject:, action:, resource:)` is the same endpoint; with any resource that is not `organization:<id>` it only says whether `subject` is one of your active end users, and `reason` is a sentence for people.
+`$gate->authorize(subject:, action:, resource:)` is the same endpoint; with any resource that is not `organization:<id>` it only says whether `subject` is one of your active end users. Its `reason` is a code too: `AuthorizeReason::OWNED_BY_TENANT` (the one `allowed: true`), `SUBJECT_INACTIVE`, `NOT_OWNED_BY_TENANT`, `NOT_A_KNOWN_IDENTITY`. The sentence a person would read is in `$decision->message`, for your logs — its wording can change, `reason` is the contract.
+
+```php
+$decision = $gate->authorize(subject: $identity->id, action: 'read', resource: 'doc:1');
+// $decision->reason === AuthorizeReason::OWNED_BY_TENANT, $decision->message === 'subject `…` is an identity owned by tenant `…`'
+```
 
 ### Sessions
 
@@ -209,7 +214,7 @@ try {
 }
 ```
 
-`revokeAll()` on a user who never had a session answers `404` (the identity service's own body, code `unknown`).
+`revokeAll()` succeeds also when the user has no session, so a "log out everywhere" button can be pressed twice. An id that is not one of your users (another account's, unknown, or one you deleted) is `403 forbidden`.
 
 ### Signed tokens (JWT)
 
@@ -396,7 +401,7 @@ try {
 
 | Status | Code | Meaning |
 |:--|:--|:--|
-| 400 | `invalid_payload` (`invalid_request` from `tokens()->create()`) | Something in the request is malformed; the message says what. |
+| 400 | `invalid_payload` | Something in the request is malformed; the message says what. |
 | 401 | `unauthorized` | No key, or a revoked or invalid one; for a session, a dead session. |
 | 402 | `ACTIVE_USER_LIMIT_REACHED`, `UPGRADE_REQUIRED`, `JOB_LIMIT_REACHED`, `PROJECT_LIMIT_REACHED`, `BILLING_HARD_BLOCKED`, `SUBSCRIPTION_PAST_DUE`, `payment_required` | A plan or billing limit. Does not lift by waiting — the SDK never retries it. |
 | 403 | `forbidden` | The key lacks the scope for this API (the message names it), or the resource is not yours. |
@@ -406,7 +411,7 @@ try {
 | 429 | `rate_limited`, `RELAY_MESSAGE_LIMIT_REACHED` | Too fast, or Relay's monthly limit. |
 | 5xx | `upstream_unavailable`, `internal_error` | Retry; quote the request id to support. |
 
-Codes are an open set; treat unknown ones generically. Answers that are not in the standard envelope — some Clockwork refusals (`{"error": "<sentence>"}`), identity-service bodies passed through (`revokeAll()` on a user without sessions, `createSigned()` on a dead session) and bodies that are not JSON — arrive with code `unknown` and their sentence (or `HTTP <status>`) as the message; the parsed body is in `$e->body`.
+Codes are an open set; treat unknown ones generically. Every API route, Clockwork's included, answers in this envelope with a string code and a request id. A body in another shape (one that did not come from the API — a proxy in between, an identity-service answer passed through on `/auth/*`, a body that is not JSON) still becomes a `VerneApiException`, with code `unknown` and its sentence (or `HTTP <status>`) as the message; the parsed body is in `$e->body`.
 
 **Retries.** A `POST` that gets a short `429` (a `Retry-After` of 60 seconds or less) is retried once after waiting. Relay's monthly limit (`429 RELAY_MESSAGE_LIMIT_REACHED`, `Retry-After` until the 1st of next month) and every `402` are thrown at once; read `$e->retryAfter`.
 

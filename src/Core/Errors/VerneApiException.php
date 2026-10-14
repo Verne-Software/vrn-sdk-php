@@ -59,10 +59,12 @@ class VerneApiException extends VerneException
     /**
      * Builds the exception from a response body of any shape. Never throws.
      *
-     * The documented envelope is `{"error": {"code", "message", "request_id", …}}`. Some
-     * answers differ: a Clockwork engine error is `{"error": "<sentence>"}`, an identity
-     * service body passed through has a numeric `code`, a proxy may answer HTML. Anything
-     * unrecognised degrades to code `unknown` and message `HTTP <status>`.
+     * Every API route answers with the envelope `{"error": {"code", "message",
+     * "request_id", …}}`. Other shapes are still read, as a fallback that costs nothing:
+     * the string form `{"error": "<sentence>"}` Clockwork used before October 2026, an
+     * identity-service body with a numeric `code` (still what Kratos' own `/auth/*`
+     * self-service routes answer), a proxy answering HTML. Anything unrecognised degrades
+     * to code `unknown` and message `HTTP <status>`.
      */
     public static function fromResponse(int $status, mixed $body, ?int $retryAfter = null): self
     {

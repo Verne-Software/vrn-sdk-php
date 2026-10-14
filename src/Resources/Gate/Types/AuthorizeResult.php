@@ -12,8 +12,8 @@ final readonly class AuthorizeResult
         /** Identifies the decision in Gate's logs, for support. */
         public string $decisionId,
         /**
-         * For an organization resource, one of the `AuthorizeReason` constants. For any
-         * other resource, a sentence for people, not a value to branch on.
+         * A code to branch on: one of the `AuthorizeReason` constants, for an organization
+         * resource and for any other.
          */
         public ?string $reason,
         /**
@@ -21,6 +21,12 @@ final readonly class AuthorizeResult
          * `member_with_permission`, `member_without_permission` and `subject_inactive`.
          */
         public ?string $role = null,
+        /**
+         * For a resource that is not an organization: the decision as a sentence, for your
+         * logs. Its wording can change; only `reason` is a contract. `null` for an
+         * organization decision.
+         */
+        public ?string $message = null,
     ) {}
 
     public static function fromArray(array $data): self
@@ -30,6 +36,7 @@ final readonly class AuthorizeResult
             decisionId: $data['decision_id'],
             reason: $data['reason'] ?? null,
             role: $data['role'] ?? null,
+            message: $data['message'] ?? null,
         );
     }
 }

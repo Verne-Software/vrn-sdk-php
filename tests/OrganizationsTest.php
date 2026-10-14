@@ -110,14 +110,30 @@ class OrganizationsTest extends GateTestCase
         $gate->organizations()->can('o1', 'u1', 'Invoices:*');
     }
 
-    public function test_reason_other_than_organization_stays_a_sentence_and_role_absent(): void
+    public function test_reason_other_than_organization_is_a_code_with_the_sentence_in_message(): void
     {
-        $gate = $this->gate([self::json(200, ['allowed' => true, 'decision_id' => 'dec_4', 'reason' => 'subject `u1` is an identity owned by tenant `t`'])]);
+        $gate = $this->gate([self::json(200, [
+            'allowed' => true,
+            'decision_id' => 'dec_4',
+            'reason' => 'owned_by_tenant',
+            'message' => 'subject `u1` is an identity owned by tenant `t`',
+        ])]);
 
         $decision = $gate->authorize(subject: 'u1', action: 'read', resource: 'doc:1');
 
-        $this->assertStringStartsWith('subject', $decision->reason);
+        $this->assertSame(AuthorizeReason::OWNED_BY_TENANT, $decision->reason);
+        $this->assertStringStartsWith('subject', (string) $decision->message);
         $this->assertNull($decision->role);
+    }
+
+    public function test_an_organization_decision_has_no_message(): void
+    {
+        $gate = $this->gate([self::json(200, ['allowed' => false, 'decision_id' => 'dec_5', 'reason' => 'not_a_member'])]);
+
+        $decision = $gate->organizations()->authorize('o1', 'u1', 'invoices:read');
+
+        $this->assertSame(AuthorizeReason::NOT_A_MEMBER, $decision->reason);
+        $this->assertNull($decision->message);
     }
 
     // --- roles ---

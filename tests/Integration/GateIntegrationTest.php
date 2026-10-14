@@ -10,6 +10,7 @@ use Vernesoft\Core\Errors\VerneApiException;
 use Vernesoft\Core\Errors\VerneTokenException;
 use Vernesoft\Gate;
 use Vernesoft\GateTokenVerifier;
+use Vernesoft\Resources\Gate\Types\AuthorizeReason;
 use Vernesoft\Resources\Gate\Types\Identity;
 use Vernesoft\Resources\Gate\Types\Organization;
 use Vernesoft\Resources\Gate\Types\Role;
@@ -294,9 +295,38 @@ class GateIntegrationTest extends TestCase
         $this->assertFalse($orgs->can($orgId, $memberId, 'members:invite'));
         $this->apiError(fn () => $orgs->can($orgId, $memberId, 'Invoices:*'), 400, 'invalid_payload');
 
-        // The plain ownership check still works, and says so in a sentence.
+        // The plain ownership check: a code in `reason`, the sentence in `message`.
         $owned = self::$gate->authorize(subject: $memberId, action: 'read', resource: 'doc:1');
         $this->assertTrue($owned->allowed);
+        $this->assertSame(AuthorizeReason::OWNED_BY_TENANT, $owned->reason);
+        $this->assertMatchesRegularExpression('/is an identity owned by tenant/', (string) $owned->message);
+        $nobody = self::$gate->authorize(subject: self::uuid(), action: 'read', resource: 'doc:1');
+        $this->assertFalse($nobody->allowed);
+        $this->assertSame(AuthorizeReason::NOT_A_KNOWN_IDENTITY, $nobody->reason);
+        $notAnId = self::$gate->authorize(subject: 'usr_123', action: 'read', resource: 'doc:1');
+        $this->assertSame(AuthorizeReason::NOT_A_KNOWN_IDENTITY, $notAnId->reason);
+        $outsiderId = self::$outsider->id;
+        self::$gate->identities()->deactivate($outsiderId);
+        try {
+            $off = self::$gate->authorize(subject: $outsiderId, action: 'read', resource: 'doc:1');
+            $this->assertFalse($off->allowed);
+            $this->assertSame(AuthorizeReason::SUBJECT_INACTIVE, $off->reason);
+        } finally {
+            self::$gate->identities()->activate($outsiderId);
+        }
+    }
+
+    public function test_a_malformed_token_request_is_invalid_payload_with_a_request_id(): void
+    {
+        $e = $this->apiError(fn () => self::$gate->tokens()->create(subject: ''), 400, 'invalid_payload');
+        $this->assertStringStartsWith('req_', (string) $e->getRequestId());
+    }
+
+    public function test_identities_no_longer_carry_the_owner_stamp(): void
+    {
+        $read = self::$gate->identities()->get(self::$member->id);
+        $this->assertStringNotContainsString('verne_tenant_id', (string) json_encode($read->raw));
+        $this->assertNull($read->traits->tenantId);
     }
 
     public function test_introspection_lists_the_end_users_organizations(): void
@@ -367,11 +397,16 @@ class GateIntegrationTest extends TestCase
         $this->apiError(fn () => self::$gate->sessions()->check($sessionToken), 401, 'unauthorized');
         $this->apiError(fn () => self::$gate->sessions()->revoke(self::uuid()), 404, 'not_found');
 
-        // "Log out everywhere": fine for a user who has had a session; a user who never
-        // signed in gets the identity service's own 404 (numeric code, so `unknown`).
+        // "Log out everywhere" is idempotent: fine for a user who has had a session, for
+        // one who never signed in, and twice over.
         self::$gate->sessions()->revokeAll(self::$member->id);
-        $e = $this->apiError(fn () => self::$gate->sessions()->revokeAll(self::$outsider->id), 404, 'unknown');
-        $this->assertNotSame('', $e->getMessage());
+        self::$gate->sessions()->revokeAll(self::$outsider->id);
+        self::$gate->sessions()->revokeAll(self::$outsider->id);
+        // An id that is not one of your users — unknown, or deleted through the API — is 403.
+        $this->apiError(fn () => self::$gate->sessions()->revokeAll(self::uuid()), 403, 'forbidden');
+        $gone = self::$gate->identities()->create(schemaId: 'user', traits: ['email' => self::email('gone')]);
+        self::$gate->identities()->delete($gone->id);
+        $this->apiError(fn () => self::$gate->sessions()->revokeAll($gone->id), 403, 'forbidden');
     }
 
     public function test_audit_log_records_membership_changes_filtered_and_paged(): void

@@ -198,7 +198,7 @@ class HttpClientTest extends TestCase
         $this->assertSame([], $e->details);
     }
 
-    public function test_a_string_error_keeps_its_sentence_with_code_unknown(): void
+    public function test_the_older_string_error_keeps_its_sentence_with_code_unknown(): void
     {
         [$client] = $this->guzzle([
             new Response(400, [], json_encode(['error' => 'Invalid cron schedule. Use five fields.'])),
@@ -211,6 +211,20 @@ class HttpClientTest extends TestCase
         $this->assertSame('Invalid cron schedule. Use five fields.', $e->getMessage());
         $this->assertNull($e->getRequestId());
         $this->assertSame(['error' => 'Invalid cron schedule. Use five fields.'], $e->body);
+    }
+
+    public function test_a_clockwork_error_is_the_standard_envelope(): void
+    {
+        [$client] = $this->guzzle([
+            new Response(400, [], json_encode(['error' => ['code' => 'invalid_payload', 'message' => 'Invalid cron schedule.', 'request_id' => 'req_cw']])),
+        ]);
+        $clockwork = new Clockwork(apiKey: self::KEY, httpClient: $client);
+
+        $e = $this->caught(fn () => $clockwork->jobs()->create(name: 'n', schedule: 'bad', url: 'https://example.com'));
+
+        $this->assertSame('invalid_payload', $e->getErrorCode());
+        $this->assertSame('Invalid cron schedule.', $e->getMessage());
+        $this->assertSame('req_cw', $e->getRequestId());
     }
 
     public function test_a_numeric_code_is_never_used_as_the_code(): void
@@ -231,13 +245,13 @@ class HttpClientTest extends TestCase
     public function test_an_envelope_without_request_id_has_a_null_request_id(): void
     {
         [$client] = $this->guzzle([
-            new Response(400, [], json_encode(['error' => ['code' => 'invalid_request', 'message' => 'subject is required']])),
+            new Response(400, [], json_encode(['error' => ['code' => 'invalid_payload', 'message' => 'subject is required']])),
         ]);
         $gate = new Gate(apiKey: self::KEY, httpClient: $client);
 
         $e = $this->caught(fn () => $gate->tokens()->create(subject: ''));
 
-        $this->assertSame('invalid_request', $e->getErrorCode());
+        $this->assertSame('invalid_payload', $e->getErrorCode());
         $this->assertNull($e->getRequestId());
     }
 
