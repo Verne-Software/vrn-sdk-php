@@ -1,6 +1,6 @@
 {
   "name": "vernesoft/sdk",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Official PHP SDK for the Verne Nautilus platform",
   "type": "library",
   "license": "MIT",
@@ -12,10 +12,22 @@
     "phpunit/phpunit": "^11.0",
     "laravel/pint": "^1.0"
   },
+  "suggest": {
+    "ext-openssl": "Needed by GateTokenVerifier / tokens()->verifySigned() to verify Gate signed tokens (ES256)."
+  },
   "autoload": {
-    "psr-4": { "Vernesoft\\": "src/" }
+    "psr-4": {
+      "Vernesoft\\": "src/"
+    }
   },
   "autoload-dev": {
-    "psr-4": { "Vernesoft\\Tests\\": "tests/" }
+    "psr-4": {
+      "Vernesoft\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "test:integration": "phpunit --testsuite Integration",
+    "lint": "pint --test"
   }
 }

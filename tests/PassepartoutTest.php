@@ -22,7 +22,7 @@ class PassepartoutTest extends TestCase
         $stack->push(Middleware::history($history));
         $guzzle = new Client(['handler' => $stack]);
 
-        return new Passepartout(apiKey: 'vrn_passepartout_test_sk_abc', httpClient: $guzzle);
+        return new Passepartout(apiKey: 'vrn_9f8a7c1b2d3e4f50', httpClient: $guzzle);
     }
 
     // --- login/start ---
@@ -48,7 +48,7 @@ class PassepartoutTest extends TestCase
         $this->assertSame('POST', $request->getMethod());
         $this->assertSame('/v1/passepartout/login/start', $request->getUri()->getPath());
         $this->assertTrue($request->hasHeader('Authorization'));
-        $this->assertSame('Bearer vrn_passepartout_test_sk_abc', $request->getHeaderLine('Authorization'));
+        $this->assertSame('Bearer vrn_9f8a7c1b2d3e4f50', $request->getHeaderLine('Authorization'));
     }
 
     // --- login/status ---
@@ -186,5 +186,23 @@ class PassepartoutTest extends TestCase
         $this->expectExceptionCode(404);
 
         $passepartout->loginStatus('nonexistent');
+    }
+
+    public function test_introspect_parses_orgs(): void
+    {
+        $passepartout = $this->makePassepartout([
+            new Response(200, [], json_encode([
+                'active' => true,
+                'subject' => 'u1',
+                'tenant_id' => 't1',
+                'orgs' => [['id' => 'o1', 'role' => 'member', 'permissions' => []]],
+            ])),
+        ]);
+
+        $result = $passepartout->introspect('pat_x');
+
+        $this->assertSame('o1', $result->orgs[0]->id);
+        $this->assertSame([], $result->orgs[0]->permissions);
+        $this->assertFalse($result->orgsTruncated);
     }
 }

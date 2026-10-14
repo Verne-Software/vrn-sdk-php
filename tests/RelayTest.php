@@ -19,7 +19,7 @@ class RelayTest extends TestCase
         $mock = new MockHandler($responses);
         $guzzle = new Client(['handler' => HandlerStack::create($mock)]);
 
-        return new Relay(apiKey: 'vrn_relay_test_sk_abc', httpClient: $guzzle);
+        return new Relay(apiKey: 'vrn_9f8a7c1b2d3e4f50', httpClient: $guzzle);
     }
 
     public function test_send_returns_message(): void

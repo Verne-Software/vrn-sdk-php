@@ -22,7 +22,7 @@ class ClockworkTest extends TestCase
         $stack->push(Middleware::history($history));
         $guzzle = new Client(['handler' => $stack]);
 
-        return new Clockwork(apiKey: 'vrn_clockwork_test_sk_abc', httpClient: $guzzle);
+        return new Clockwork(apiKey: 'vrn_9f8a7c1b2d3e4f50', httpClient: $guzzle);
     }
 
     private function cronJobPayload(array $overrides = []): array
@@ -334,5 +334,44 @@ class ClockworkTest extends TestCase
         $this->expectExceptionCode(404);
 
         $clockwork->jobs()->update('nonexistent', ['is_active' => false]);
+    }
+
+    public function test_usage_returns_plan_and_limits(): void
+    {
+        $history = [];
+        $clockwork = $this->makeClockwork([
+            new Response(200, [], json_encode([
+                'plan' => 'free',
+                'tier' => 'free',
+                'cron' => ['active' => 3, 'limit' => 10],
+                'delayed' => ['pending' => 12, 'limit' => null],
+            ])),
+        ], $history);
+
+        $usage = $clockwork->usage();
+
+        $this->assertSame('GET', $history[0]['request']->getMethod());
+        $this->assertSame('/v1/clockwork/usage', $history[0]['request']->getUri()->getPath());
+        $this->assertSame('free', $usage->plan);
+        $this->assertSame('free', $usage->tier);
+        $this->assertSame(3, $usage->cron->active);
+        $this->assertSame(10, $usage->cron->limit);
+        $this->assertSame(12, $usage->delayed->pending);
+        $this->assertNull($usage->delayed->limit);
+    }
+
+    public function test_execution_carries_attempt(): void
+    {
+        $clockwork = $this->makeClockwork([
+            new Response(200, [], json_encode([[
+                'id' => 'ex_1', 'job_id' => 'job_1', 'status' => 'failed', 'started_at' => '2026-08-06T00:00:00Z',
+                'completed_at' => null, 'duration_ms' => null, 'response_status' => 500, 'response_body' => null,
+                'error_message' => 'HTTP 500', 'attempt' => 2,
+            ]])),
+        ]);
+
+        $executions = $clockwork->jobs()->executions('job_1');
+
+        $this->assertSame(2, $executions[0]->attempt);
     }
 }

@@ -23,29 +23,29 @@ class GateTest extends TestCase
         $stack->push(Middleware::history($history));
         $guzzle = new Client(['handler' => $stack]);
 
-        return new Gate(apiKey: 'vrn_gate_test_sk_abc', httpClient: $guzzle);
+        return new Gate(apiKey: 'vrn_9f8a7c1b2d3e4f50', httpClient: $guzzle);
     }
 
     // --- Identities ---
 
     public function test_create_identity_returns_identity(): void
     {
+        $history = [];
         $gate = $this->makeGate([
             new Response(201, [], json_encode([
                 'id' => 'identity_123',
                 'schema_id' => 'user',
                 'state' => 'active',
-                'traits' => [
-                    'email' => 'user@example.com',
-                    'tenant_id' => 'ten_001',
-                    'custom_data' => ['role' => 'editor'],
-                ],
+                'traits' => ['email' => 'user@example.com', 'locale' => 'fr'],
+                'created_at' => '2026-10-01T00:00:00Z',
+                'metadata_public' => ['plan' => 'pro'],
+                'verifiable_addresses' => [['value' => 'user@example.com', 'verified' => false, 'via' => 'email']],
             ])),
-        ]);
+        ], $history);
 
         $identity = $gate->identities()->create(
             schemaId: 'user',
-            traits: ['email' => 'user@example.com', 'custom_data' => ['role' => 'editor']],
+            traits: ['email' => 'user@example.com', 'locale' => 'fr'],
             credentials: ['password' => ['config' => ['password' => 'Secret123!']]],
             state: 'active',
         );
@@ -54,8 +54,35 @@ class GateTest extends TestCase
         $this->assertSame('user', $identity->schemaId);
         $this->assertSame('active', $identity->state);
         $this->assertSame('user@example.com', $identity->traits->email);
-        $this->assertSame('ten_001', $identity->traits->tenantId);
-        $this->assertSame(['role' => 'editor'], $identity->traits->customData);
+        $this->assertSame('fr', $identity->traits->locale);
+        $this->assertNull($identity->traits->tenantId);
+        $this->assertSame('2026-10-01T00:00:00Z', $identity->createdAt);
+        $this->assertSame(['plan' => 'pro'], $identity->metadataPublic);
+        $this->assertCount(1, $identity->verifiableAddresses);
+        $this->assertSame('identity_123', $identity->raw['id']);
+        $this->assertSame([
+            'schema_id' => 'user',
+            'traits' => ['email' => 'user@example.com', 'locale' => 'fr'],
+            'state' => 'active',
+            'credentials' => ['password' => ['config' => ['password' => 'Secret123!']]],
+        ], json_decode((string) $history[0]['request']->getBody(), true));
+    }
+
+    public function test_identity_traits_keep_unknown_traits_in_extra(): void
+    {
+        $gate = $this->makeGate([
+            new Response(200, [], json_encode([
+                'id' => 'identity_123',
+                'schema_id' => 'user',
+                'state' => 'active',
+                'traits' => ['email' => 'user@example.com', 'nickname' => 'ada'],
+            ])),
+        ]);
+
+        $identity = $gate->identities()->get('identity_123');
+
+        $this->assertSame(['nickname' => 'ada'], $identity->traits->extra);
+        $this->assertNull($identity->traits->locale);
     }
 
     public function test_get_identity(): void
@@ -65,10 +92,7 @@ class GateTest extends TestCase
                 'id' => 'identity_123',
                 'schema_id' => 'user',
                 'state' => 'active',
-                'traits' => [
-                    'email' => 'user@example.com',
-                    'tenant_id' => 'ten_001',
-                ],
+                'traits' => ['email' => 'user@example.com'],
             ])),
         ]);
 
@@ -77,26 +101,29 @@ class GateTest extends TestCase
         $this->assertSame('identity_123', $identity->id);
     }
 
-    public function test_patch_identity_returns_updated(): void
+    public function test_patch_identity_sends_json_patch_array(): void
     {
+        $history = [];
         $gate = $this->makeGate([
             new Response(200, [], json_encode([
                 'id' => 'identity_123',
                 'schema_id' => 'user',
                 'state' => 'active',
-                'traits' => [
-                    'email' => 'user@example.com',
-                    'tenant_id' => 'ten_001',
-                    'custom_data' => ['role' => 'admin'],
-                ],
+                'traits' => ['email' => 'new@example.com'],
             ])),
-        ]);
+        ], $history);
 
         $identity = $gate->identities()->patch('identity_123', [
-            ['op' => 'replace', 'path' => '/traits/custom_data/role', 'value' => 'admin'],
+            ['op' => 'replace', 'path' => '/traits/email', 'value' => 'new@example.com'],
         ]);
 
-        $this->assertSame(['role' => 'admin'], $identity->traits->customData);
+        $this->assertSame('new@example.com', $identity->traits->email);
+        $request = $history[0]['request'];
+        $this->assertSame('PATCH', $request->getMethod());
+        $this->assertSame(
+            [['op' => 'replace', 'path' => '/traits/email', 'value' => 'new@example.com']],
+            json_decode((string) $request->getBody(), true),
+        );
     }
 
     public function test_delete_identity_returns_void(): void
@@ -118,7 +145,7 @@ class GateTest extends TestCase
                 'id' => 'identity_123',
                 'schema_id' => 'user',
                 'state' => 'inactive',
-                'traits' => ['email' => 'user@example.com', 'tenant_id' => 'ten_001'],
+                'traits' => ['email' => 'user@example.com'],
             ])),
         ], $history);
 
@@ -139,7 +166,7 @@ class GateTest extends TestCase
                 'id' => 'identity_123',
                 'schema_id' => 'user',
                 'state' => 'active',
-                'traits' => ['email' => 'user@example.com', 'tenant_id' => 'ten_001'],
+                'traits' => ['email' => 'user@example.com'],
             ])),
         ], $history);
 
@@ -156,7 +183,7 @@ class GateTest extends TestCase
                 'id' => 'identity_123',
                 'schema_id' => 'user',
                 'state' => 'inactive',
-                'traits' => ['email' => 'user@example.com', 'tenant_id' => 'ten_001'],
+                'traits' => ['email' => 'user@example.com'],
             ])),
         ], $history);
 
@@ -199,12 +226,12 @@ class GateTest extends TestCase
 
     // --- Tokens ---
 
-    public function test_tokens_create_does_not_send_authorization_header(): void
+    public function test_tokens_create_sends_authorization_header_and_no_api_key_in_body(): void
     {
         $history = [];
         $gate = $this->makeGate([
-            new Response(200, [], json_encode([
-                'access_token' => 'gat_test_at_abc123',
+            new Response(201, [], json_encode([
+                'access_token' => 'gat_live_abc123',
                 'expires_at' => '2026-03-17T12:00:00Z',
                 'subject' => 'usr_123',
                 'tenant_id' => 'ten_001',
@@ -215,14 +242,19 @@ class GateTest extends TestCase
 
         $this->assertCount(1, $history);
         $request = $history[0]['request'];
-        $this->assertFalse($request->hasHeader('Authorization'), 'tokens()->create() must NOT send Authorization header');
+        $this->assertSame('POST', $request->getMethod());
+        $this->assertSame('/v1/gate/tokens', $request->getUri()->getPath());
+        $this->assertSame('Bearer vrn_9f8a7c1b2d3e4f50', $request->getHeaderLine('Authorization'));
+        $body = json_decode((string) $request->getBody(), true);
+        $this->assertSame(['subject' => 'usr_123'], $body);
+        $this->assertArrayNotHasKey('api_key', $body);
     }
 
     public function test_tokens_create_returns_access_token(): void
     {
         $gate = $this->makeGate([
-            new Response(200, [], json_encode([
-                'access_token' => 'gat_test_at_abc123',
+            new Response(201, [], json_encode([
+                'access_token' => 'gat_live_abc123',
                 'expires_at' => '2026-03-17T12:00:00Z',
                 'subject' => 'usr_123',
                 'tenant_id' => 'ten_001',
@@ -235,7 +267,7 @@ class GateTest extends TestCase
             ttlSeconds: 3600,
         );
 
-        $this->assertSame('gat_test_at_abc123', $token->accessToken);
+        $this->assertSame('gat_live_abc123', $token->accessToken);
         $this->assertSame('2026-03-17T12:00:00Z', $token->expiresAt);
         $this->assertSame('usr_123', $token->subject);
         $this->assertSame('ten_001', $token->tenantId);
@@ -253,13 +285,15 @@ class GateTest extends TestCase
             ])),
         ]);
 
-        $result = $gate->tokens()->introspect('gat_test_at_abc123');
+        $result = $gate->tokens()->introspect('gat_live_abc123');
 
         $this->assertTrue($result->active);
         $this->assertSame('usr_123', $result->subject);
         $this->assertSame('ten_001', $result->tenantId);
         $this->assertSame(['gate.tokens.read'], $result->scopes);
         $this->assertSame('2026-03-17T12:00:00Z', $result->expiresAt);
+        $this->assertNull($result->orgs);
+        $this->assertFalse($result->orgsTruncated);
     }
 
     // --- Authorize ---
