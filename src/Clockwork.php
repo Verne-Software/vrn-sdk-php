@@ -8,6 +8,7 @@ use GuzzleHttp\ClientInterface;
 use Vernesoft\Core\HttpClient;
 use Vernesoft\Resources\Clockwork\CronJobsResource;
 use Vernesoft\Resources\Clockwork\DelayedJobsResource;
+use Vernesoft\Resources\Clockwork\Types\ClockworkUsage;
 
 class Clockwork
 {
@@ -19,7 +20,7 @@ class Clockwork
 
     public function __construct(
         string $apiKey,
-        string $baseUrl = 'https://api.vernesoft.com',
+        string $baseUrl = HttpClient::DEFAULT_BASE_URL,
         int $timeoutSeconds = 30,
         ?ClientInterface $httpClient = null,
     ) {
@@ -39,5 +40,17 @@ class Clockwork
     public function delayed(): DelayedJobsResource
     {
         return $this->delayedResource ??= new DelayedJobsResource($this->httpClient);
+    }
+
+    /**
+     * How many jobs exist against the plan's limits. Creating a job over a limit, or
+     * resuming a paused one, is refused with `402` (`UPGRADE_REQUIRED` or
+     * `JOB_LIMIT_REACHED`) — never retried.
+     */
+    public function usage(): ClockworkUsage
+    {
+        $data = $this->httpClient->get('/v1/clockwork/usage');
+
+        return ClockworkUsage::fromArray($data ?? []);
     }
 }

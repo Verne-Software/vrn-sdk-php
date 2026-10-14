@@ -16,6 +16,8 @@ final readonly class Execution
         public ?int $responseStatus,
         public ?string $responseBody,
         public ?string $errorMessage,
+        /** Which attempt of the run this row is, from 1. A retried run has one row per attempt. */
+        public ?int $attempt = null,
     ) {}
 
     public static function fromArray(array $data): self
@@ -30,6 +32,7 @@ final readonly class Execution
             responseStatus: $data['response_status'] ?? null,
             responseBody: $data['response_body'] ?? null,
             errorMessage: $data['error_message'] ?? null,
+            attempt: isset($data['attempt']) ? (int) $data['attempt'] : null,
         );
     }
 }

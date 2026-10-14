@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Vernesoft\Resources\Gate\Types;
 
+/** A short-lived opaque access token (`gat_live_…`) from `tokens()->create()`. */
 final readonly class AccessToken
 {
     public function __construct(

@@ -16,7 +16,7 @@ class Relay
 
     public function __construct(
         string $apiKey,
-        string $baseUrl = 'https://api.vernesoft.com',
+        string $baseUrl = HttpClient::DEFAULT_BASE_URL,
         int $timeoutSeconds = 30,
         ?ClientInterface $httpClient = null,
     ) {
