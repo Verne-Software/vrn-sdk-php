@@ -165,6 +165,76 @@ class ClockworkTest extends TestCase
         );
     }
 
+    public function test_jobs_create_sends_timezone_and_reads_it_back(): void
+    {
+        $history = [];
+        $clockwork = $this->makeClockwork([
+            new Response(201, [], json_encode($this->cronJobPayload([
+                'schedule' => '0 9 * * *',
+                'timezone' => 'Europe/Paris',
+                'next_run_at' => '2026-10-16T07:00:00Z',
+            ]))),
+        ], $history);
+
+        $job = $clockwork->jobs()->create(
+            name: 'morning',
+            schedule: '0 9 * * *',
+            url: 'https://example.com/hook',
+            timezone: 'Europe/Paris',
+        );
+
+        $this->assertSame('Europe/Paris', $job->timezone);
+        $this->assertSame('2026-10-16T07:00:00Z', $job->nextRunAt);
+        $this->assertSame(
+            [
+                'name' => 'morning',
+                'schedule' => '0 9 * * *',
+                'url' => 'https://example.com/hook',
+                'timezone' => 'Europe/Paris',
+            ],
+            json_decode((string) $history[0]['request']->getBody(), true),
+        );
+    }
+
+    public function test_jobs_update_sends_a_new_timezone(): void
+    {
+        $history = [];
+        $clockwork = $this->makeClockwork([
+            new Response(200, [], json_encode($this->cronJobPayload(['timezone' => 'America/New_York']))),
+        ], $history);
+
+        $job = $clockwork->jobs()->update('job_123', ['timezone' => 'America/New_York']);
+
+        $this->assertSame('America/New_York', $job->timezone);
+        $this->assertSame(['timezone' => 'America/New_York'], json_decode((string) $history[0]['request']->getBody(), true));
+    }
+
+    public function test_a_job_without_timezone_in_the_answer_is_utc(): void
+    {
+        $clockwork = $this->makeClockwork([new Response(200, [], json_encode([$this->cronJobPayload()]))]);
+
+        $this->assertSame('UTC', $clockwork->jobs()->list()[0]->timezone);
+    }
+
+    public function test_an_unknown_timezone_is_400_invalid_payload(): void
+    {
+        $clockwork = $this->makeClockwork([
+            new Response(400, [], json_encode(['error' => [
+                'code' => 'invalid_payload',
+                'message' => 'Unknown timezone "Mars/Olympus".',
+                'request_id' => 'req_tz',
+            ]])),
+        ]);
+
+        try {
+            $clockwork->jobs()->create(name: 'x', schedule: '0 9 * * *', url: 'https://example.com', timezone: 'Mars/Olympus');
+            $this->fail('expected a 400');
+        } catch (VerneApiException $e) {
+            $this->assertSame(400, $e->getStatus());
+            $this->assertSame('invalid_payload', $e->getErrorCode());
+        }
+    }
+
     public function test_jobs_update_passes_fields_straight_as_patch_body(): void
     {
         $history = [];
