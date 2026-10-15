@@ -1,9 +1,29 @@
 {
   "name": "vernesoft/sdk",
-  "version": "1.4.0",
-  "description": "Official PHP SDK for the Verne Nautilus platform",
+  "version": "1.4.1",
+  "description": "Official PHP SDK for Nautilus by Verne Software: sign-in and users, webhook delivery, cron jobs and Telegram sign-in. Hosted in France.",
+  "keywords": [
+    "nautilus",
+    "verne",
+    "sdk",
+    "authentication",
+    "webhooks",
+    "cron",
+    "telegram-login",
+    "jwt",
+    "ory-kratos",
+    "svix",
+    "gdpr",
+    "eu-hosted"
+  ],
+  "homepage": "https://vernesoft.com",
   "type": "library",
   "license": "MIT",
+  "support": {
+    "docs": "https://docs.vernesoft.com",
+    "source": "https://github.com/Verne-Software/vrn-sdk-php",
+    "issues": "https://github.com/Verne-Software/vrn-sdk-php/issues"
+  },
   "require": {
     "php": ">=8.2",
     "guzzlehttp/guzzle": "^7.0"
