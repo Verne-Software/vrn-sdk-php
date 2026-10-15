@@ -17,18 +17,31 @@ class IdentitiesResource
      * Creates a new identity (end user) bound to your tenant. Answers `201`.
      *
      * Traits are `email` (required) and `locale` only — anything else is refused with
-     * `400 invalid_payload`. Keep your own fields in custom metadata (`updateMetadata()`).
-     * A `409 conflict` means you already have an end user with this address; the same
-     * address at another tenant is a different person and does not conflict.
+     * `400 invalid_payload`. Keep your own fields in custom metadata (`$metadataPublic`, or
+     * `updateMetadata()` later). A `409 conflict` means you already have an end user with
+     * this address; the same address at another tenant is a different person and does not
+     * conflict.
+     *
+     * To import a user from another system, send the bcrypt hash of their password
+     * (`['password' => ['config' => ['hashed_password' => '$2b$10$…']]]`), the social
+     * accounts they used (`['oidc' => ['config' => ['providers' => [['provider' => 'google',
+     * 'subject' => '…']]]]]`) and `emailVerified: true` if that system had already confirmed
+     * the address. `$credentials` holds either the initial password or that hash, and the
+     * linked social accounts.
      *
      * @param  array{email: string, locale?: string}  $traits
-     * @param  array<string, mixed>|null  $credentials  e.g. `['password' => ['config' => ['password' => '…']]]`
+     * @param  array{password?: array{config: array{password?: string, hashed_password?: string}}, oidc?: array{config: array{providers: list<array{provider: string, subject: string}>}}}|null  $credentials
+     * @param  bool|null  $emailVerified  `true` creates the user with the address already confirmed; null or
+     *                                    `false` leaves it unconfirmed. It is your word: Gate sends no mail to check it.
+     * @param  array<string, mixed>|null  $metadataPublic  Your custom metadata for the user. The user can read it.
      */
     public function create(
         string $schemaId,
         array $traits,
         ?array $credentials = null,
         string $state = 'active',
+        ?bool $emailVerified = null,
+        ?array $metadataPublic = null,
     ): Identity {
         $body = [
             'schema_id' => $schemaId,
@@ -38,6 +51,15 @@ class IdentitiesResource
 
         if ($credentials !== null) {
             $body['credentials'] = $credentials;
+        }
+
+        if ($emailVerified !== null) {
+            $body['email_verified'] = $emailVerified;
+        }
+
+        if ($metadataPublic !== null) {
+            // An empty array would go out as `[]`, which is not an object.
+            $body['metadata_public'] = $metadataPublic === [] ? new \stdClass : $metadataPublic;
         }
 
         $data = $this->httpClient->post('/v1/gate/identities', $body);

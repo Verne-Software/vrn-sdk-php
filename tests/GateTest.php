@@ -68,6 +68,59 @@ class GateTest extends TestCase
         ], json_decode((string) $history[0]['request']->getBody(), true));
     }
 
+    public function test_create_identity_for_an_import_sends_hash_oidc_email_verified_and_metadata(): void
+    {
+        $history = [];
+        $gate = $this->makeGate([
+            new Response(201, [], json_encode([
+                'id' => 'identity_456',
+                'schema_id' => 'user',
+                'state' => 'active',
+                'traits' => ['email' => 'ada@example.com'],
+                'metadata_public' => ['previous_user_id' => 'auth0|64f1c0ffee'],
+                'verifiable_addresses' => [['value' => 'ada@example.com', 'verified' => true, 'via' => 'email', 'status' => 'completed']],
+            ])),
+        ], $history);
+
+        $credentials = [
+            'password' => ['config' => ['hashed_password' => '$2b$10$pl0VVKxZkNvtC9ttGwsT8.vPL8qWeEevw4a6FraeqQR8GQ6mT63NG']],
+            'oidc' => ['config' => ['providers' => [['provider' => 'google', 'subject' => '109876543210987654321']]]],
+        ];
+        $identity = $gate->identities()->create(
+            schemaId: 'user',
+            traits: ['email' => 'ada@example.com'],
+            credentials: $credentials,
+            emailVerified: true,
+            metadataPublic: ['previous_user_id' => 'auth0|64f1c0ffee'],
+        );
+
+        $this->assertTrue($identity->verifiableAddresses[0]['verified']);
+        $this->assertSame(['previous_user_id' => 'auth0|64f1c0ffee'], $identity->metadataPublic);
+        $this->assertSame([
+            'schema_id' => 'user',
+            'traits' => ['email' => 'ada@example.com'],
+            'state' => 'active',
+            'credentials' => $credentials,
+            'email_verified' => true,
+            'metadata_public' => ['previous_user_id' => 'auth0|64f1c0ffee'],
+        ], json_decode((string) $history[0]['request']->getBody(), true));
+    }
+
+    public function test_create_identity_sends_email_verified_false_and_empty_metadata_as_an_object(): void
+    {
+        $history = [];
+        $gate = $this->makeGate([
+            new Response(201, [], json_encode(['id' => 'i', 'schema_id' => 'user', 'state' => 'active', 'traits' => ['email' => 'a@b.c']])),
+        ], $history);
+
+        $gate->identities()->create(schemaId: 'user', traits: ['email' => 'a@b.c'], emailVerified: false, metadataPublic: []);
+
+        $this->assertSame(
+            '{"schema_id":"user","traits":{"email":"a@b.c"},"state":"active","email_verified":false,"metadata_public":{}}',
+            (string) $history[0]['request']->getBody(),
+        );
+    }
+
     public function test_identity_traits_keep_unknown_traits_in_extra(): void
     {
         $gate = $this->makeGate([

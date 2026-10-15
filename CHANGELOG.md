@@ -4,7 +4,26 @@ All notable changes to `vernesoft/sdk`. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
-## [1.4.1] — unreleased
+## [1.5.0] — unreleased
+
+### Added
+
+- **Time zones for cron jobs**: `CronJob::$timezone` (an IANA name, `UTC` unless set — also
+  for an answer without the field), `timezone:` on `clockwork()->jobs()->create()`, and
+  `'timezone'` in the `update()` fields. `'0 9 * * *'` in `Europe/Paris` runs at 09:00 Paris
+  time all year round; `$nextRunAt` stays in UTC. An unknown zone is `400 invalid_payload`.
+- **Importing users**: `identities()->create()` gains `emailVerified:` (`true` creates the
+  user with the address already confirmed) and `metadataPublic:`. `$credentials` is
+  documented as an array shape with `password.config.hashed_password` (bcrypt) and
+  `oidc.config.providers`; it was already sent as given.
+
+### Changed
+
+- `guzzlehttp/guzzle` is required as `^7.0 || ^8.0`: an application on Guzzle 8 (Laravel 13
+  installs it) can `composer require vernesoft/sdk` without `-W`. The suite passes on
+  Guzzle 7.15 and 8.2, PHP 8.2 and 8.4; no code change was needed.
+
+## [1.4.1] — 2026-10-15
 
 ### Changed
 
