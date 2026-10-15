@@ -6,6 +6,10 @@ namespace Vernesoft\Resources\Clockwork\Types;
 
 final readonly class CronJob
 {
+    /**
+     * @param  string  $timezone  IANA time zone `$schedule` is read in, e.g. `Europe/Paris`;
+     *                            `UTC` unless set. `$nextRunAt` and every other timestamp stay in UTC.
+     */
     public function __construct(
         public string $id,
         public string $tenantId,
@@ -20,6 +24,7 @@ final readonly class CronJob
         public ?string $nextRunAt,
         public string $createdAt,
         public string $updatedAt,
+        public string $timezone = 'UTC',
     ) {}
 
     public static function fromArray(array $data): self
@@ -38,6 +43,7 @@ final readonly class CronJob
             nextRunAt: $data['next_run_at'] ?? null,
             createdAt: $data['created_at'],
             updatedAt: $data['updated_at'],
+            timezone: $data['timezone'] ?? 'UTC',
         );
     }
 }

@@ -1,6 +1,6 @@
 {
   "name": "vernesoft/sdk",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Official PHP SDK for Nautilus by Verne Software: sign-in and users, webhook delivery, cron jobs and Telegram sign-in. Hosted in France.",
   "keywords": [
     "nautilus",
@@ -26,7 +26,7 @@
   },
   "require": {
     "php": ">=8.2",
-    "guzzlehttp/guzzle": "^7.0"
+    "guzzlehttp/guzzle": "^7.0 || ^8.0"
   },
   "require-dev": {
     "phpunit/phpunit": "^11.0",

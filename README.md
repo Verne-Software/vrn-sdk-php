@@ -10,7 +10,7 @@ The official PHP library for [Nautilus by Verne Software](https://vernesoft.com)
 
 ## Requirements
 
-PHP 8.2 or later (the response types are readonly classes). `ext-openssl` to verify signed tokens.
+PHP 8.2 or later (the response types are readonly classes) and Guzzle 7 or 8. `ext-openssl` to verify signed tokens.
 
 ## Installation
 
@@ -115,6 +115,24 @@ $gate->identities()->resendVerification($identity->id);
 ```
 
 The typed fields are on the result (`$identity->traits->email`, `->createdAt`, `->metadataPublic`, …); the whole object as the API sent it is in `$identity->raw`.
+
+**Importing users** from another system: send the bcrypt hash of their password instead of the password, the social accounts they signed in with, `emailVerified: true` if that system had already confirmed the address, and your metadata — all in one call:
+
+```php
+$imported = $gate->identities()->create(
+    schemaId: 'user',
+    traits: ['email' => 'ada@example.com'],
+    credentials: [
+        'password' => ['config' => ['hashed_password' => '$2b$10$pl0VVKxZkNvtC9ttGwsT8.vPL8qWeEevw4a6FraeqQR8GQ6mT63NG']],
+        'oidc' => ['config' => ['providers' => [['provider' => 'google', 'subject' => '109876543210987654321']]]],
+    ],
+    emailVerified: true, // the address starts confirmed; Gate sends no mail to check it
+    metadataPublic: ['previous_user_id' => 'auth0|64f1c0ffee'],
+);
+$imported->verifiableAddresses[0]['verified']; // true
+```
+
+The user then signs in with their original password. Without `emailVerified: true` a new user's address starts unconfirmed.
 
 Your own fields about a user go in **custom metadata**, not in traits (any trait other than `email` and `locale` is a `400`):
 
@@ -338,6 +356,18 @@ $job = $verne->clockwork()->jobs()->create(
     headers: ['X-Token' => 'secret'],   // optional
     body: '{"scope":"daily"}',          // optional
 );
+
+// Read the schedule in a time zone: 09:00 in Paris all year round —
+// 07:00 UTC in summer, 08:00 UTC in winter. Without `timezone:` a job is UTC.
+$morning = $verne->clockwork()->jobs()->create(
+    name: 'morning-digest',
+    schedule: '0 9 * * *',
+    url: 'https://example.com/hooks/digest',
+    timezone: 'Europe/Paris', // IANA name; an unknown one is 400 invalid_payload
+);
+$morning->timezone;  // 'Europe/Paris'
+$morning->nextRunAt; // in UTC, e.g. '2026-10-16T07:00:00Z'
+$verne->clockwork()->jobs()->update($morning->id, ['timezone' => 'America/New_York']);
 
 // List all cron jobs
 $jobs = $verne->clockwork()->jobs()->list(); // CronJob[]
