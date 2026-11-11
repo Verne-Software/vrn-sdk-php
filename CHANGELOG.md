@@ -4,7 +4,7 @@ All notable changes to `vernesoft/sdk`. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
-## [1.6.0] — unreleased
+## [1.6.0] — 2026-11-11
 
 What the organization routes answer since Nautilus v1.10.44, mapped into the types.
 
