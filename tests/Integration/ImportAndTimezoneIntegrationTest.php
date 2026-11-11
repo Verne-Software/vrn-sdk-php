@@ -60,16 +60,16 @@ class ImportAndTimezoneIntegrationTest extends TestCase
         $this->cleanup[] = fn () => $jobs->delete($job->id);
 
         $this->assertSame('Europe/Paris', $job->timezone);
-        // 09:00 in Paris in October (CEST, UTC+2) is 07:00 UTC.
-        $this->assertMatchesRegularExpression('/T07:00:00(\.0+)?(Z|\+00:00)$/', (string) $job->nextRunAt);
+        // 09:00 in Paris is 07:00 UTC in summer (CEST, UTC+2) and 08:00 UTC in winter (CET).
+        $this->assertMatchesRegularExpression('/T0[78]:00:00(\.0+)?(Z|\+00:00)$/', (string) $job->nextRunAt);
 
         $listed = array_values(array_filter($jobs->list(), fn ($j) => $j->id === $job->id));
         $this->assertSame('Europe/Paris', $listed[0]->timezone);
 
         $moved = $jobs->update($job->id, ['timezone' => 'America/New_York']);
         $this->assertSame('America/New_York', $moved->timezone);
-        // 09:00 in New York in October (EDT, UTC-4) is 13:00 UTC.
-        $this->assertMatchesRegularExpression('/T13:00:00(\.0+)?(Z|\+00:00)$/', (string) $moved->nextRunAt);
+        // 09:00 in New York is 13:00 UTC in summer (EDT, UTC-4) and 14:00 UTC in winter (EST).
+        $this->assertMatchesRegularExpression('/T1[34]:00:00(\.0+)?(Z|\+00:00)$/', (string) $moved->nextRunAt);
 
         $jobs->delete($job->id);
     }
