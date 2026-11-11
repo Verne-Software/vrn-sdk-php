@@ -33,7 +33,7 @@ What the organization routes answer since Nautilus v1.10.44, mapped into the typ
 The new constructor parameters come last and have defaults, so code that builds these
 objects itself keeps working.
 
-## [1.5.0] — unreleased
+## [1.5.0] — 2026-10-25
 
 ### Added
 
