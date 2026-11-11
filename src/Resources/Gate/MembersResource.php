@@ -14,8 +14,9 @@ class MembersResource
     public function __construct(private HttpClient $httpClient) {}
 
     /**
-     * Gives an end user a role in the organization. `404` if the identity is not one of
-     * your end users, `409 conflict` if they already are a member (change the role with
+     * Gives an end user a role in the organization. `404 not_found` with reason `end_user`
+     * if the identity is not one of your end users, `409 conflict` with reason
+     * `already_member` if they already are a member (change the role with
      * `update()`).
      *
      * @param  string|\DateTimeInterface|null  $expiresAt  when the membership ends (a
@@ -35,6 +36,9 @@ class MembersResource
     }
 
     /**
+     * The organization's members with their `$email` and `$displayName`, one page at a
+     * time; `$total` on the page is how many it has in all.
+     *
      * @return Paginated<Member>
      */
     public function list(string $orgId, ?int $limit = null, ?string $cursor = null): Paginated
@@ -50,7 +54,8 @@ class MembersResource
      * The deadline has three cases: leave `$expiresAt` null and `$clearExpiresAt` false
      * to **keep** it; pass `$clearExpiresAt: true` to **remove** it (sends `null`); pass a
      * time to **set** it. Passing both is an `InvalidArgumentException`. Sending neither a
-     * role nor a deadline change is refused by the API with `400`.
+     * role nor a deadline change is refused by the API with `400`; a person who is not a
+     * member, with `404 not_found` and reason `member`.
      *
      * @throws \InvalidArgumentException when both `$expiresAt` and `$clearExpiresAt` are given
      */

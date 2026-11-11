@@ -4,21 +4,25 @@ declare(strict_types=1);
 
 namespace Vernesoft\Tests;
 
+use Vernesoft\Core\Errors\ErrorReason;
 use Vernesoft\Core\Errors\VerneApiException;
 use Vernesoft\Resources\Gate\Types\AuthorizeReason;
+use Vernesoft\Resources\Gate\Types\Member;
+use Vernesoft\Resources\Gate\Types\Organization;
 
 class OrganizationsTest extends GateTestCase
 {
-    private const ORG = ['id' => 'o1', 'name' => 'Acme', 'created_at' => '2026-10-01T00:00:00Z', 'updated_at' => '2026-10-02T00:00:00Z'];
+    private const ORG = ['id' => 'o1', 'name' => 'Acme', 'member_count' => 12, 'created_at' => '2026-10-01T00:00:00Z', 'updated_at' => '2026-10-02T00:00:00Z'];
 
     private const ROLE = [
         'id' => 'r1', 'organization_id' => 'o1', 'name' => 'admin',
-        'permissions' => ['invoices:read', 'invoices:write'],
+        'permissions' => ['invoices:read', 'invoices:write'], 'member_count' => 3,
         'created_at' => '2026-10-01T00:00:00Z', 'updated_at' => '2026-10-01T00:00:00Z',
     ];
 
     private const MEMBER = [
-        'organization_id' => 'o1', 'identity_id' => 'u1', 'role_id' => 'r1', 'expires_at' => null,
+        'organization_id' => 'o1', 'identity_id' => 'u1', 'role_id' => 'r1',
+        'email' => 'alice@example.com', 'display_name' => 'Alice', 'expires_at' => null,
         'created_at' => '2026-10-01T00:00:00Z', 'updated_at' => '2026-10-01T00:00:00Z',
     ];
 
@@ -55,6 +59,53 @@ class OrganizationsTest extends GateTestCase
         $this->assertSame('c2', $page->nextCursor);
         $this->assertFalse($last->hasMore);
         $this->assertNull($last->nextCursor);
+    }
+
+    public function test_list_carries_total_and_each_organization_its_member_count(): void
+    {
+        $gate = $this->gate([
+            self::json(200, ['data' => [self::ORG], 'has_more' => true, 'next_cursor' => 'c2', 'total' => 37]),
+            self::json(200, self::ORG),
+        ]);
+
+        $page = $gate->organizations()->list(limit: 1);
+        $org = $gate->organizations()->get('o1');
+
+        $this->assertSame(37, $page->total);
+        $this->assertSame(12, $page->data[0]->memberCount);
+        $this->assertSame(12, $org->memberCount);
+    }
+
+    public function test_a_list_that_does_not_count_has_a_null_total(): void
+    {
+        $gate = $this->gate([self::json(200, [
+            'data' => [['id' => 'o1', 'role' => 'admin', 'permissions' => []]], 'has_more' => false, 'next_cursor' => null,
+        ])]);
+
+        $this->assertNull($gate->identities()->listOrganizations('u1')->total);
+    }
+
+    public function test_an_answer_without_the_new_fields_still_reads(): void
+    {
+        $org = Organization::fromArray(['id' => 'o1', 'name' => 'Acme']);
+        $member = Member::fromArray(['identity_id' => 'u1', 'role_id' => 'r1']);
+
+        $this->assertSame(0, $org->memberCount);
+        $this->assertNull($member->email);
+        $this->assertNull($member->displayName);
+    }
+
+    public function test_a_missing_organization_is_404_with_reason_organization(): void
+    {
+        $gate = $this->gate([self::json(404, ['error' => [
+            'code' => 'not_found', 'message' => 'Organization not found.', 'request_id' => 'r', 'reason' => 'organization',
+        ]])]);
+
+        $e = $this->caught(fn () => $gate->organizations()->get('o1'));
+
+        $this->assertSame(404, $e->getStatus());
+        $this->assertSame('not_found', $e->getErrorCode());
+        $this->assertSame(ErrorReason::ORGANIZATION, $e->getReason());
     }
 
     public function test_get_update_delete_encode_the_id(): void
@@ -167,6 +218,39 @@ class OrganizationsTest extends GateTestCase
         $this->assertRequest('DELETE', '/v1/gate/organizations/o1/roles/r1', [], 4);
     }
 
+    public function test_roles_list_carries_total_and_a_role_its_member_count(): void
+    {
+        $gate = $this->gate([self::json(200, ['data' => [self::ROLE], 'has_more' => false, 'next_cursor' => null, 'total' => 2])]);
+
+        $page = $gate->organizations()->roles()->list('o1');
+
+        $this->assertSame(2, $page->total);
+        $this->assertSame(3, $page->data[0]->memberCount);
+    }
+
+    public function test_role_refusals_carry_their_reason(): void
+    {
+        $gate = $this->gate([
+            self::json(409, ['error' => ['code' => 'conflict', 'message' => 'This role is held by 1 member and cannot be deleted.', 'request_id' => 'r', 'reason' => 'role_held']]),
+            self::json(409, ['error' => ['code' => 'conflict', 'message' => 'This organization already has a role with that name.', 'request_id' => 'r', 'reason' => 'role_name_taken']]),
+            self::json(404, ['error' => ['code' => 'not_found', 'message' => 'Role not found.', 'request_id' => 'r', 'reason' => 'role']]),
+            self::json(409, ['error' => ['code' => 'limit_reached', 'message' => 'An organization has at most 100 roles.', 'request_id' => 'r']]),
+        ]);
+        $roles = $gate->organizations()->roles();
+
+        $held = $this->caught(fn () => $roles->delete('o1', 'r1'));
+        $taken = $this->caught(fn () => $roles->create('o1', name: 'admin'));
+        $missing = $this->caught(fn () => $roles->get('o1', 'r9'));
+        $limit = $this->caught(fn () => $roles->create('o1', name: 'r101'));
+
+        $this->assertSame(['conflict', ErrorReason::ROLE_HELD], [$held->getErrorCode(), $held->getReason()]);
+        // Kept where 1.5 put it, so code reading the details still works.
+        $this->assertSame('role_held', $held->getDetails()['reason']);
+        $this->assertSame(['conflict', ErrorReason::ROLE_NAME_TAKEN], [$taken->getErrorCode(), $taken->getReason()]);
+        $this->assertSame(['not_found', ErrorReason::ROLE], [$missing->getErrorCode(), $missing->getReason()]);
+        $this->assertSame(['limit_reached', null], [$limit->getErrorCode(), $limit->getReason()]);
+    }
+
     public function test_role_create_without_permissions_sends_only_the_name(): void
     {
         $gate = $this->gate([self::json(201, self::ROLE)]);
@@ -228,10 +312,46 @@ class OrganizationsTest extends GateTestCase
         $gate->organizations()->members()->update('o1', 'u1', expiresAt: '2027-01-01T00:00:00Z', clearExpiresAt: true);
     }
 
+    public function test_every_member_answer_carries_email_and_display_name(): void
+    {
+        $gate = $this->gate([
+            self::json(201, self::MEMBER),
+            // A Telegram user: no address, the first name they signed in with.
+            self::json(200, ['email' => null, 'display_name' => 'Jules'] + self::MEMBER),
+        ]);
+        $members = $gate->organizations()->members();
+
+        $added = $members->add('o1', identityId: 'u1', roleId: 'r1');
+        $updated = $members->update('o1', 'u1', roleId: 'r1');
+
+        $this->assertSame('alice@example.com', $added->email);
+        $this->assertSame('Alice', $added->displayName);
+        $this->assertNull($updated->email);
+        $this->assertSame('Jules', $updated->displayName);
+    }
+
+    public function test_member_refusals_carry_their_reason(): void
+    {
+        $gate = $this->gate([
+            self::json(404, ['error' => ['code' => 'not_found', 'message' => 'End user not found.', 'request_id' => 'r', 'reason' => 'end_user']]),
+            self::json(409, ['error' => ['code' => 'conflict', 'message' => 'Already a member.', 'request_id' => 'r', 'reason' => 'already_member']]),
+            self::json(404, ['error' => ['code' => 'not_found', 'message' => 'Member not found.', 'request_id' => 'r', 'reason' => 'member']]),
+        ]);
+        $members = $gate->organizations()->members();
+
+        $stranger = $this->caught(fn () => $members->add('o1', identityId: 'u9', roleId: 'r1'));
+        $twice = $this->caught(fn () => $members->add('o1', identityId: 'u1', roleId: 'r1'));
+        $notMember = $this->caught(fn () => $members->update('o1', 'u2', roleId: 'r1'));
+
+        $this->assertSame([404, ErrorReason::END_USER], [$stranger->getStatus(), $stranger->getReason()]);
+        $this->assertSame([409, ErrorReason::ALREADY_MEMBER], [$twice->getStatus(), $twice->getReason()]);
+        $this->assertSame([404, ErrorReason::MEMBER], [$notMember->getStatus(), $notMember->getReason()]);
+    }
+
     public function test_members_list_and_remove(): void
     {
         $gate = $this->gate([
-            self::json(200, ['data' => [self::MEMBER], 'has_more' => false, 'next_cursor' => null]),
+            self::json(200, ['data' => [self::MEMBER], 'has_more' => false, 'next_cursor' => null, 'total' => 1]),
             self::json(204, null),
         ]);
 
@@ -241,10 +361,22 @@ class OrganizationsTest extends GateTestCase
         $this->assertRequest('GET', '/v1/gate/organizations/o1/members');
         $this->assertSame('u1', $page->data[0]->identityId);
         $this->assertSame('r1', $page->data[0]->roleId);
+        $this->assertSame('alice@example.com', $page->data[0]->email);
+        $this->assertSame(1, $page->total);
         $this->assertRequest('DELETE', '/v1/gate/organizations/o1/members/u1', [], 1);
     }
 
     // --- a user's organizations ---
+
+    private function caught(callable $call): VerneApiException
+    {
+        try {
+            $call();
+        } catch (VerneApiException $e) {
+            return $e;
+        }
+        $this->fail('expected a VerneApiException');
+    }
 
     public function test_identities_list_organizations_returns_org_claims(): void
     {

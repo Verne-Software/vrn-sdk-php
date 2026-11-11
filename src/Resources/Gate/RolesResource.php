@@ -22,8 +22,8 @@ class RolesResource
     public function __construct(private HttpClient $httpClient) {}
 
     /**
-     * Defines a role. `409 conflict` if the name is taken in the organization,
-     * `409 limit_reached` past 100 roles.
+     * Defines a role. `409 conflict` with reason `role_name_taken` if the name is taken in
+     * the organization, `409 limit_reached` past 100 roles.
      *
      * @param  string[]|null  $permissions
      */
@@ -40,6 +40,9 @@ class RolesResource
     }
 
     /**
+     * The organization's roles, one page at a time; `$total` on the page is how many it
+     * has in all.
+     *
      * @return Paginated<Role>
      */
     public function list(string $orgId, ?int $limit = null, ?string $cursor = null): Paginated
@@ -78,7 +81,8 @@ class RolesResource
     }
 
     /**
-     * Deletes a role. A role someone holds is refused with `409 conflict`.
+     * Deletes a role. A role someone holds is refused with `409 conflict`, reason
+     * `role_held` — `$memberCount` on the role says so before you try.
      */
     public function delete(string $orgId, string $roleId): void
     {

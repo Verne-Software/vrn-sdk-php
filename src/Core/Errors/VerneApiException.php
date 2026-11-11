@@ -24,6 +24,17 @@ class VerneApiException extends VerneException
     public readonly array $details;
 
     /**
+     * Which one of its kind the error is, when the API says: on the organization routes a
+     * `404 not_found` names what was not found (`organization`, `role`, `member`,
+     * `end_user`, `project`) and a `409 conflict` why it is one (`role_name_taken`,
+     * `role_held`, `already_member`) — the `ErrorReason` constants. `getErrorCode()` is
+     * unchanged, so code that ignores the reason behaves as before. `null` when the error
+     * has none, and for a body that is not the API's envelope. The same value stays in
+     * `$details['reason']`.
+     */
+    public readonly ?string $reason;
+
+    /**
      * Seconds from the `Retry-After` header, when the response had one. On a `429` it is
      * how long to wait; for `RELAY_MESSAGE_LIMIT_REACHED` it runs to the 1st of next month.
      */
@@ -47,6 +58,7 @@ class VerneApiException extends VerneException
         array $details = [],
         ?int $retryAfter = null,
         mixed $body = null,
+        ?string $reason = null,
     ) {
         parent::__construct($message, $httpStatus);
         $this->errorCode = $errorCode;
@@ -54,6 +66,7 @@ class VerneApiException extends VerneException
         $this->details = $details;
         $this->retryAfter = $retryAfter;
         $this->body = $body;
+        $this->reason = $reason;
     }
 
     /**
@@ -64,7 +77,9 @@ class VerneApiException extends VerneException
      * the string form `{"error": "<sentence>"}` Clockwork used before October 2026, an
      * identity-service body with a numeric `code` (still what Kratos' own `/auth/*`
      * self-service routes answer), a proxy answering HTML. Anything unrecognised degrades
-     * to code `unknown` and message `HTTP <status>`.
+     * to code `unknown` and message `HTTP <status>`. The reason is read only from the
+     * envelope proper (a string `code`): in an identity-service body it is a sentence for
+     * people, not a code.
      */
     public static function fromResponse(int $status, mixed $body, ?int $retryAfter = null): self
     {
@@ -81,12 +96,15 @@ class VerneApiException extends VerneException
             }
         }
 
-        $code = $envelope !== null && isset($envelope['code']) && is_string($envelope['code']) && $envelope['code'] !== ''
-            ? $envelope['code']
-            : 'unknown';
+        $stringCode = $envelope !== null && isset($envelope['code']) && is_string($envelope['code']);
+        $code = $stringCode && $envelope['code'] !== '' ? $envelope['code'] : 'unknown';
 
         $requestId = $envelope !== null && isset($envelope['request_id']) && is_string($envelope['request_id'])
             ? $envelope['request_id']
+            : null;
+
+        $reason = $stringCode && isset($envelope['reason']) && is_string($envelope['reason'])
+            ? $envelope['reason']
             : null;
 
         return new self(
@@ -97,6 +115,7 @@ class VerneApiException extends VerneException
             details: $details,
             retryAfter: $retryAfter,
             body: $body,
+            reason: $reason,
         );
     }
 
@@ -122,6 +141,15 @@ class VerneApiException extends VerneException
     public function getRequestId(): ?string
     {
         return $this->requestId;
+    }
+
+    /**
+     * Which `404` or `409` this is on the organization routes — one of the `ErrorReason`
+     * constants, or a value added later — or `null` when the error has no reason.
+     */
+    public function getReason(): ?string
+    {
+        return $this->reason;
     }
 
     /**

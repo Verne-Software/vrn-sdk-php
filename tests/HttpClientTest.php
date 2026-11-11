@@ -242,6 +242,39 @@ class HttpClientTest extends TestCase
         $this->assertSame(['status' => 'Not Found'], $e->details);
     }
 
+    public function test_a_reason_in_the_envelope_is_read_without_changing_the_code(): void
+    {
+        [$client] = $this->guzzle([
+            new Response(409, [], json_encode(['error' => ['code' => 'conflict', 'message' => 'x', 'request_id' => 'r', 'reason' => 'something_new']])),
+            new Response(404, [], json_encode(['error' => ['code' => 'not_found', 'message' => 'No such identity.', 'request_id' => 'r']])),
+            new Response(404, [], json_encode(['error' => ['code' => 'not_found', 'message' => 'm', 'reason' => 42]])),
+        ]);
+        $gate = new Gate(apiKey: self::KEY, httpClient: $client);
+
+        $unknown = $this->caught(fn () => $gate->sessions()->revokeAll('u1'));
+        $none = $this->caught(fn () => $gate->sessions()->revokeAll('u1'));
+        $notAString = $this->caught(fn () => $gate->sessions()->revokeAll('u1'));
+
+        $this->assertSame('conflict', $unknown->getErrorCode());
+        $this->assertSame('something_new', $unknown->getReason());
+        $this->assertSame('something_new', $unknown->reason);
+        $this->assertNull($none->getReason());
+        $this->assertNull($notAString->getReason());
+    }
+
+    public function test_an_identity_service_sentence_is_not_taken_for_a_reason(): void
+    {
+        [$client] = $this->guzzle([
+            new Response(400, [], json_encode(['error' => ['code' => 400, 'status' => 'Bad Request', 'reason' => 'The request was malformed.', 'message' => 'm']])),
+        ]);
+        $gate = new Gate(apiKey: self::KEY, httpClient: $client);
+
+        $e = $this->caught(fn () => $gate->sessions()->revokeAll('u1'));
+
+        $this->assertSame('unknown', $e->getErrorCode());
+        $this->assertNull($e->getReason());
+    }
+
     public function test_an_envelope_without_request_id_has_a_null_request_id(): void
     {
         [$client] = $this->guzzle([

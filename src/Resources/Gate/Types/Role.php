@@ -17,6 +17,11 @@ final readonly class Role
         public array $permissions,
         public string $createdAt,
         public string $updatedAt,
+        /**
+         * How many people hold the role right now. A role someone holds cannot be deleted
+         * (`409 conflict`, reason `role_held`).
+         */
+        public int $memberCount = 0,
     ) {}
 
     public static function fromArray(array $data): self
@@ -28,6 +33,7 @@ final readonly class Role
             permissions: array_values($data['permissions'] ?? []),
             createdAt: $data['created_at'] ?? '',
             updatedAt: $data['updated_at'] ?? '',
+            memberCount: (int) ($data['member_count'] ?? 0),
         );
     }
 }

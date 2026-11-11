@@ -4,7 +4,36 @@ All notable changes to `vernesoft/sdk`. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
-## [1.5.0] — unreleased
+## [1.6.0] — 2026-11-11
+
+What the organization routes answer since Nautilus v1.10.44, mapped into the types.
+
+### Added
+
+- **Who a member is**: `Member::$email` and `Member::$displayName`, on every answer that
+  carries a member (`members()->add()`, `list()`, `update()`). Both are `null` when the
+  person has none: a Telegram user has no address, and their name is the first name (or
+  the username) they signed in with.
+- **Counts**: `Organization::$memberCount` (people holding a role in it) and
+  `Role::$memberCount` (people holding that role — a role with members cannot be deleted).
+  `Paginated::$total`: on `organizations()->list()`, `roles()->list()` and
+  `members()->list()` it is how many the whole list has, the same on every page; `null` on
+  the lists that do not count.
+- **Why a 404 or a 409**: `VerneApiException::getReason()` (and `$reason`). On the
+  organization routes a `404 not_found` names what was not found (`organization`, `role`,
+  `member`, `end_user`, `project`) and a `409 conflict` why it is one (`role_name_taken`,
+  `role_held`, `already_member`); the new `Vernesoft\Core\Errors\ErrorReason` holds them
+  as constants. `getErrorCode()` is unchanged, and the value stays in `$details['reason']`
+  too, so 1.5 code behaves as before. The reason is read only from the API's envelope,
+  never from an identity-service body passed through on `/auth/*`, where it is a sentence.
+- The audit log records `organization.created` and `organization.updated` (a rename, with
+  `previous_name` in `details`). `auditLog()->list(action: …)` takes them as it takes any
+  action; nothing changed in the SDK for that.
+
+The new constructor parameters come last and have defaults, so code that builds these
+objects itself keeps working.
+
+## [1.5.0] — 2026-10-25
 
 ### Added
 

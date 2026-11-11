@@ -45,7 +45,8 @@ class OrganizationsResource
     }
 
     /**
-     * Lists the project's organizations, oldest first, one page at a time.
+     * Lists the project's organizations, oldest first, one page at a time. `$total` on the
+     * page is how many the project has in all.
      *
      * @param  int|null  $limit  1–100, default 20 (the server clamps values outside the range)
      * @param  string|null  $cursor  the previous page's `nextCursor`
@@ -58,6 +59,10 @@ class OrganizationsResource
         return Paginated::fromArray($data, static fn (array $o): Organization => Organization::fromArray($o));
     }
 
+    /**
+     * One organization. `404 not_found` with reason `organization` if the project has none
+     * by that id.
+     */
     public function get(string $orgId): Organization
     {
         $data = $this->httpClient->get(self::path($orgId));

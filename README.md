@@ -166,19 +166,27 @@ $gate->organizations()->members()->add(
 // clearExpiresAt: true to remove it, a time to set it.
 $gate->organizations()->members()->update($org->id, $identity->id, clearExpiresAt: true);
 
-// Lists are cursor-paged: loop while hasMore, passing nextCursor as cursor
+// Lists are cursor-paged: loop while hasMore, passing nextCursor as cursor.
+// $page->total is how many the whole list has, the same on every page.
 $cursor = null;
 do {
     $page = $gate->organizations()->members()->list($org->id, limit: 50, cursor: $cursor);
-    foreach ($page->data as $member) { /* $member->identityId, $member->roleId */ }
+    foreach ($page->data as $member) {
+        // $member->identityId, $member->roleId,
+        // $member->email (null for a Telegram user), $member->displayName (or null)
+    }
     $cursor = $page->nextCursor;
 } while ($page->hasMore);
+
+// How many people hold a role in the organization, and hold this role
+$gate->organizations()->get($org->id)->memberCount;
+$gate->organizations()->roles()->get($org->id, $admin->id)->memberCount;
 
 // A user's organizations, with role and permissions in each
 $held = $gate->identities()->listOrganizations($identity->id); // Paginated<OrgClaim>
 ```
 
-A role somebody holds cannot be deleted (`409 conflict`); a second role of the same name in one organization is `409 conflict`; past 100 roles, `409 limit_reached`. Deleting an organization removes its roles and members.
+A role somebody holds cannot be deleted (`409 conflict`, reason `role_held` — its `memberCount` says so before you try); a second role of the same name in one organization is `409 conflict` with reason `role_name_taken`; adding someone who already is a member, reason `already_member`; past 100 roles, `409 limit_reached`. A `404` on these routes says what was not found in its reason: `organization`, `role`, `member` or `end_user` (an id that is not one of your end users). The reasons are the `Vernesoft\Core\Errors\ErrorReason` constants, read with `$e->getReason()`. Deleting an organization removes its roles and members.
 
 #### Checking a permission
 
@@ -420,6 +428,7 @@ try {
 } catch (VerneApiException $e) {
     $e->getCode();      // HTTP status — branch on status + code
     $e->getErrorCode(); // e.g. 'conflict'
+    $e->getReason();    // on a 404/409 of the organization routes: which one, e.g. ErrorReason::ALREADY_MEMBER
     $e->getMessage();   // a sentence to show a person
     $e->details;        // extra members of the error, e.g. ['plan' => …, 'limit' => …, 'current' => …]
     $e->retryAfter;     // seconds, when the response had Retry-After
@@ -436,8 +445,8 @@ try {
 | 402 | `ACTIVE_USER_LIMIT_REACHED`, `UPGRADE_REQUIRED`, `JOB_LIMIT_REACHED`, `PROJECT_LIMIT_REACHED`, `BILLING_HARD_BLOCKED`, `SUBSCRIPTION_PAST_DUE`, `payment_required` | A plan or billing limit. Does not lift by waiting — the SDK never retries it. |
 | 403 | `forbidden` | The key lacks the scope for this API (the message names it), or the resource is not yours. |
 | 403 | `plan_required`, `mfa_required`, `account_disabled` | A rule not in your plan; a second factor owed; a deactivated Telegram user. |
-| 404 | `not_found` | No such thing in your project. |
-| 409 | `conflict`, `limit_reached` | It already exists **in your account** (an end user with that address, a role name, a membership), a role still held, or a cap reached. |
+| 404 | `not_found` | No such thing in your project. On the organization routes `getReason()` says what: `organization`, `role`, `member`, `end_user`. |
+| 409 | `conflict`, `limit_reached` | It already exists **in your account** (an end user with that address, a role name, a membership), a role still held, or a cap reached. On the organization routes `getReason()` says which: `role_name_taken`, `role_held`, `already_member`. |
 | 429 | `rate_limited`, `RELAY_MESSAGE_LIMIT_REACHED` | Too fast, or Relay's monthly limit. |
 | 5xx | `upstream_unavailable`, `internal_error` | Retry; quote the request id to support. |
 
@@ -465,7 +474,7 @@ composer lint      # Laravel Pint, check only (./vendor/bin/pint to fix)
 
 ### Integration tests
 
-`composer test:integration` runs every 1.4.0 resource against a real Nautilus stack. It is opt-in and skipped without a key; it creates end users, an organization and settings changes, and removes them again.
+`composer test:integration` runs every resource against a real Nautilus stack. It is opt-in and skipped without a key; it creates end users, an organization and settings changes, and removes them again.
 
 | Variable | |
 |:--|:--|
